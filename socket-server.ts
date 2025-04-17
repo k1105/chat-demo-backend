@@ -9,16 +9,42 @@ const io = new SocketIOServer(httpServer, {
   },
 });
 
+// 接続中のユーザー情報を管理
+const connectedUsers = new Map<string, string>();
+
 io.on("connection", (socket) => {
   console.log("Client connected");
+
+  // ユーザー名を生成して保存
+  const userName = `User-${socket.id.slice(0, 4)}`;
+  connectedUsers.set(socket.id, userName);
 
   socket.on("message", (message) => {
     console.log("Received message:", message);
     io.emit("message", message);
   });
 
+  // タイピング開始イベント
+  socket.on("typingStart", (data = {}) => {
+    const userName = data?.username || connectedUsers.get(socket.id);
+    socket.broadcast.emit("userTyping", {
+      userId: socket.id,
+      username: userName,
+    });
+  });
+
+  // タイピング終了イベント
+  socket.on("typingStop", (data = {}) => {
+    const userName = data?.username || connectedUsers.get(socket.id);
+    socket.broadcast.emit("userStoppedTyping", {
+      userId: socket.id,
+      username: userName,
+    });
+  });
+
   socket.on("disconnect", () => {
     console.log("Client disconnected");
+    connectedUsers.delete(socket.id);
   });
 });
 
